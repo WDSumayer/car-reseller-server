@@ -37,6 +37,34 @@ async function run() {
             const cars = await carsCollections.find(query).toArray()
             res.send(cars)
         })
+        app.get('/products', async(req, res) => {
+            const email = req.query.email
+            const query = {
+                seller_email: email
+            }
+            const products = await carsCollections.find(query).toArray()
+            res.send(products)
+        })
+        app.get('/orders', async(req, res) => {
+            const email = req.query.email
+            const query = {email: email}
+            const orders = await orderCollections.find(query).toArray()
+            res.send(orders)
+        })
+
+        app.get('/users/seller/:email',  async(req, res) => {
+            const email = req.params.email
+            const query = {email}
+            const user = await userCollections.findOne(query)
+            res.send({isSeller: user?.role === 'Seller'})
+        })
+
+        app.post('/cars', async(req, res) => {
+            const car = req.body
+            const result = await carsCollections.insertOne(car)
+            res.send(result)
+        })
+
        app.put('/users/:email', async(req, res) => {
         const email = req.params.email
         const user = req.body
@@ -48,19 +76,17 @@ async function run() {
         const result = await userCollections.updateOne(query, updatedDoc, options)
         res.send(result)
        })
-       app.post('/orders/:id', async(req, res) => {
-            const id = req.params.id
+       app.put('/orders', async(req, res) => {
+           
             const order = req.body
             const email = order.email
-            const query = {email: email}
-            const booked = await orderCollections.find(query).toArray()
-            console.log(booked)
-            const band = booked.map(book => book._id === id)
-            if(band.length){
-                const message = `you have already booked`
-                return res.send({acknowledged: false, message})
+            const id = order.car_id
+            const query = {email, car_id: id}
+            const options = {upsert: true}
+            const updatedDoc = {
+                $set: order
             }
-            const result = await orderCollections.insertOne(order)
+            const result = await orderCollections.updateOne(query, updatedDoc, options)
             res.send(result)
        })
 
