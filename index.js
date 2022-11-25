@@ -58,7 +58,26 @@ async function run() {
             const user = await userCollections.findOne(query)
             res.send({isSeller: user?.role === 'Seller'})
         })
-
+        app.get('/users/admin/:email',  async(req, res) => {
+            const email = req.params.email
+            const query = {email}
+            const user = await userCollections.findOne(query)
+            res.send({isAdmin: user?.role === 'Admin'})
+        })
+        app.get('/users/sellers', async(req, res) => {
+            const query = {
+                role: "Seller"
+            }
+            const sellers = await userCollections.find(query).toArray()
+            res.send(sellers)
+        })
+        app.get('/users/buyers', async(req, res) => {
+            const query = {
+                role: "User"
+            }
+            const buyers = await userCollections.find(query).toArray()
+            res.send(buyers)
+        })
         app.post('/cars', async(req, res) => {
             const car = req.body
             const result = await carsCollections.insertOne(car)
