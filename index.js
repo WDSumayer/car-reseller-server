@@ -127,6 +127,12 @@ async function run() {
             const result = await orderCollections.updateOne(query, updatedDoc, options)
             res.send(result)
        })
+       app.delete('/users/:id', async(req, res) => {
+        const id = req.params.id;
+        const filter = {_id: ObjectId(id)}
+        const user = await userCollections.deleteOne(filter)
+        res.send(user)
+    })
 
     }
     finally{
