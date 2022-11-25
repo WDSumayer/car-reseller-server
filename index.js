@@ -52,6 +52,13 @@ async function run() {
             res.send(orders)
         })
 
+        app.get('/user/status/:email', async(req, res) => {
+            const email = req.params.email;
+            const query = {email: email}
+            const result = await userCollections.findOne(query)
+            res.send(result)
+        })
+
         app.get('/users/seller/:email',  async(req, res) => {
             const email = req.params.email
             const query = {email}
@@ -95,6 +102,18 @@ async function run() {
         const result = await userCollections.updateOne(query, updatedDoc, options)
         res.send(result)
        })
+       app.put('/users/status/:id',async(req, res) => {      
+        const id = req.params.id
+        const filter = {_id: ObjectId(id)}
+        const options = { upsert: true } 
+        const updateDoc = {
+            $set: {
+                status: 'Verified'
+            }
+        }
+        const result = await userCollections.updateOne(filter, updateDoc, options)
+        res.send(result)
+    })
        app.put('/orders', async(req, res) => {
            
             const order = req.body
