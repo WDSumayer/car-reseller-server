@@ -1,6 +1,7 @@
 const express = require('express')
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken')
 const cors = require('cors');
 require('dotenv').config()
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
@@ -17,6 +18,25 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@clu
 console.log(uri)
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+
+function verifyJWT (req, res, next) {
+    const authHeader = req.headers.authorization
+    if(!authHeader){
+        return res.status(401).send('unauthorized access')
+    }
+    const token = authHeader.split(' ')[1]
+    console.log(token)
+    jwt.verify(token, process.env.SECTET_TOKEN, function(err, decoded) {
+        if(err){
+            return res.status(403).send({message: 'fobidden access'})
+        }
+        req.decoded = decoded
+        next()
+    })
+}
+
+
+
 async function run() {
 
     try{
@@ -27,18 +47,36 @@ async function run() {
         const paymentCollections = client.db('car-Reseller').collection('payments')
         const addvertiseCollections = client.db('car-Reseller').collection('advertises')
 
+        const verifyAdmin = async(req, res, next) => {
+            const decodedEmail = req.decoded.email
+            const query = {email: decodedEmail}
+            console.log(decodedEmail)
+            const user = await userCollections.findOne(query)
+            if(user?.role !== "Admin"){
+                return res.status(403).send({message: 'forbidden access'})
+            }
+            next()
+        }
+
+
+
+
         app.get('/categories', async(req, res) => {
             const query = {}
             const categories = await categoryCollections.find(query).toArray()
             res.send(categories)
         })
         app.get('/cars/brand/:id', async(req, res) => {
-            const id = req.params.id
-            const query = {
-                category_id: id
-            }
-            const cars = await carsCollections.find(query).toArray()
-            res.send(cars)
+           
+           
+                const id = req.params.id
+                const query = {
+                    category_id: id
+                }
+                const cars = await carsCollections.find(query).toArray()
+                res.send(cars)
+           
+           
         })
         app.get('/products', async(req, res) => {
             const email = req.query.email
@@ -52,6 +90,8 @@ async function run() {
             const email = req.query.email
             const query = {email: email}
             const orders = await orderCollections.find(query).toArray()
+
+           
             res.send(orders)
         })
         app.get('/orders/:id', async(req, res) => {
@@ -80,20 +120,32 @@ async function run() {
             const user = await userCollections.findOne(query)
             res.send({isAdmin: user?.role === 'Admin'})
         })
-        app.get('/users/sellers', async(req, res) => {
+        app.get('/users/sellers',verifyJWT, verifyAdmin, async(req, res) => {
             const query = {
                 role: "Seller"
             }
             const sellers = await userCollections.find(query).toArray()
             res.send(sellers)
         })
-        app.get('/users/buyers', async(req, res) => {
+        app.get('/users/buyers',verifyJWT, verifyAdmin, async(req, res) => {
             const query = {
                 role: "User"
             }
             const buyers = await userCollections.find(query).toArray()
             res.send(buyers)
         })
+
+        app.get('/jwt', async(req, res) => {
+            const email = req.query.email;
+            const query = {email: email}
+            const user = await userCollections.findOne(query)
+            if(user){
+                const token = jwt.sign({email}, process.env.SECTET_TOKEN, {expiresIn: '30s'})
+                return res.send({accessToken: token})
+            }
+            res.status(403).send({accessToken: ''})
+        })
+
 
         app.get('/addvertises', async(req, res) => {
             const query = {}
@@ -200,7 +252,16 @@ async function run() {
         const filter = {_id: ObjectId(id)}
         const user = await userCollections.deleteOne(filter)
         res.send(user)
-    })
+       })
+       app.delete('/cars/:id', async(req, res) => {
+        const id = req.params.id
+        const filter = {_id: ObjectId(id)}
+        const car = await carsCollections.deleteOne(filter)
+        const query = {car_id: id}
+        const advgProduct = await addvertiseCollections.deleteOne(query)
+        res.send(car)
+        
+       })
 
     }
     finally{
