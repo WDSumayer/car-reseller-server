@@ -57,6 +57,16 @@ async function run() {
             }
             next()
         }
+        const verifySeller = async(req, res, next) => {
+            const decodedEmail = req.decoded.email
+            const query = {email: decodedEmail}
+            console.log(decodedEmail)
+            const user = await userCollections.findOne(query)
+            if(user?.role !== "Seller"){
+                return res.status(403).send({message: 'forbidden access'})
+            }
+            next()
+        }
 
 
 
@@ -68,7 +78,6 @@ async function run() {
         })
         app.get('/cars/brand/:id', async(req, res) => {
            
-           
                 const id = req.params.id
                 const query = {
                     category_id: id
@@ -78,7 +87,7 @@ async function run() {
            
            
         })
-        app.get('/products', async(req, res) => {
+        app.get('/products',verifyJWT, verifySeller, async(req, res) => {
             const email = req.query.email
             const query = {
                 seller_email: email
@@ -86,8 +95,12 @@ async function run() {
             const products = await carsCollections.find(query).toArray()
             res.send(products)
         })
-        app.get('/orders', async(req, res) => {
+        app.get('/orders',verifyJWT, async(req, res) => {
             const email = req.query.email
+            const decodedEmail = req.decoded.email
+            if(email !== decodedEmail){
+                return res.status(403).send({message: 'forbidden access'})
+            }
             const query = {email: email}
             const orders = await orderCollections.find(query).toArray()
 
