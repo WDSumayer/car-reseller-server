@@ -15,7 +15,7 @@ app.use(express.json())
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.nrkuqgj.mongodb.net/?retryWrites=true&w=majority`;
-console.log(uri)
+
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 
@@ -25,7 +25,7 @@ function verifyJWT (req, res, next) {
         return res.status(401).send('unauthorized access')
     }
     const token = authHeader.split(' ')[1]
-    console.log(token)
+   
     jwt.verify(token, process.env.SECTET_TOKEN, function(err, decoded) {
         if(err){
             return res.status(403).send({message: 'fobidden access'})
@@ -44,13 +44,16 @@ async function run() {
         const carsCollections = client.db('car-Reseller').collection('cars')
         const userCollections = client.db('car-Reseller').collection('users')
         const orderCollections = client.db('car-Reseller').collection('orders')
+        const wishCollections = client.db('car-Reseller').collection('wishes')
+        const galleryCollections = client.db('car-Reseller').collection('gallery')
         const paymentCollections = client.db('car-Reseller').collection('payments')
         const addvertiseCollections = client.db('car-Reseller').collection('advertises')
+        
 
         const verifyAdmin = async(req, res, next) => {
             const decodedEmail = req.decoded.email
             const query = {email: decodedEmail}
-            console.log(decodedEmail)
+           
             const user = await userCollections.findOne(query)
             if(user?.role !== "Admin"){
                 return res.status(403).send({message: 'forbidden access'})
@@ -60,7 +63,7 @@ async function run() {
         const verifySeller = async(req, res, next) => {
             const decodedEmail = req.decoded.email
             const query = {email: decodedEmail}
-            console.log(decodedEmail)
+           
             const user = await userCollections.findOne(query)
             if(user?.role !== "Seller"){
                 return res.status(403).send({message: 'forbidden access'})
@@ -87,6 +90,15 @@ async function run() {
            
            
         })
+        app.get('/galleryItems', async(req, res) => {
+           
+              
+                const query = {}
+                const gallery = await galleryCollections.find(query).toArray()
+                res.send(gallery)
+           
+           
+        })
         app.get('/products',verifyJWT, verifySeller, async(req, res) => {
             const email = req.query.email
             const query = {
@@ -107,6 +119,18 @@ async function run() {
            
             res.send(orders)
         })
+        app.get('/wishes',verifyJWT, async(req, res) => {
+            const email = req.query.email
+            const decodedEmail = req.decoded.email
+            if(email !== decodedEmail){
+                return res.status(403).send({message: 'forbidden access'})
+            }
+            const query = {email: email}
+            const wishes = await wishCollections.find(query).toArray()
+
+           
+            res.send(wishes)
+        })
         app.get('/orders/:id', async(req, res) => {
             const id = req.params.id
             const query = {_id: ObjectId(id)}
@@ -121,6 +145,12 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/users/buyer/:email',  async(req, res) => {
+            const email = req.params.email
+            const query = {email}
+            const user = await userCollections.findOne(query)
+            res.send({isUser: user?.role === 'User'})
+        })
         app.get('/users/seller/:email',  async(req, res) => {
             const email = req.params.email
             const query = {email}
@@ -153,7 +183,7 @@ async function run() {
             const query = {email: email}
             const user = await userCollections.findOne(query)
             if(user){
-                const token = jwt.sign({email}, process.env.SECTET_TOKEN, {expiresIn: '30s'})
+                const token = jwt.sign({email}, process.env.SECTET_TOKEN, {expiresIn: '1h'})
                 return res.send({accessToken: token})
             }
             res.status(403).send({accessToken: ''})
@@ -164,6 +194,12 @@ async function run() {
             const query = {}
             const advgProducts = await addvertiseCollections.find(query).toArray()
             res.send(advgProducts)
+        })
+
+        app.post('/brand', async(req, res) => {
+            const brand = req.body
+            const result = await categoryCollections.insertOne(brand)
+            res.send(result)
         })
 
         app.post('/cars', async(req, res) => {
@@ -247,6 +283,20 @@ async function run() {
             const result = await orderCollections.updateOne(query, updatedDoc, options)
             res.send(result)
        })
+       app.put('/wishes', async(req, res) => {
+           
+            const wish = req.body
+            const email = wish.email
+            const id = wish.car_id
+            const query = {email, car_id: id}
+            const options = {upsert: true}
+            const updatedDoc = {
+                $set: wish
+            }
+            const result = await wishCollections.updateOne(query, updatedDoc, options)
+            res.send(result)
+       })
+     
        app.put('/addvertise', async(req, res) => {
            
             const advgProduct = req.body
@@ -273,6 +323,22 @@ async function run() {
         const query = {car_id: id}
         const advgProduct = await addvertiseCollections.deleteOne(query)
         res.send(car)
+        
+       })
+       app.delete('/order/:id', async(req, res) => {
+        const id = req.params.id
+        const filter = {_id: ObjectId(id)}
+        const orderedCar = await orderCollections.deleteOne(filter)
+       
+        res.send(orderedCar)
+        
+       })
+       app.delete('/wishedCar/:id', async(req, res) => {
+        const id = req.params.id
+        const filter = {_id: ObjectId(id)}
+        const wishedCar = await wishCollections.deleteOne(filter)
+       
+        res.send(wishedCar)
         
        })
 
